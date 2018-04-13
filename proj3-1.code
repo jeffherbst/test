@@ -1,0 +1,169 @@
+<define KEYWORDS ("hd" "tl" "ref" "not" "and" "or") />
+<define TOKEN (("<""=")(">""=")("[""]")(":"":"))/>
+<define PARSE CODE.Goal />
+
+<code TypeList match=CODE.Type/>
+<code TypeList pars=(elemtype) match=CODE.Type/>
+
+<code IntType match=CODE.Type> int </code>
+<code FloatType match=CODE.Type> float </code>
+<code TypeError match=CODE.Type> TYPE_ERROR </code>
+<code PtrType pars=(elemtype) match=CODE.Type> [@elemtype@] </code>
+
+<code ATTR pars=(exp,type) />
+
+
+
+<code L4Nop pars=(op, opd1, opd2, opd3, opd4, t) match=CODE.S>
+@"new list<"t">("opd1 ", new list<"t">("opd2", new list<"t">("opd3", new list<"t">("opd4",0))))"@</code>
+
+<code L4op pars=(op, opd1, opd2, opd3, opd4, opd5, t) match=CODE.S>
+@"new list<"t">("opd1 ", new list<"t">("opd2", new list<"t">("opd3", new list<"t">("opd4", new list<"t">("opd5",0)))))"@</code>
+
+<code L2op pars=(op, opd1, opd2, t) match=CODE.S> @"new list<"t">("opd1 ", new list<"t">("opd2", 0))"@ </code>
+<code Lop pars=(op, opd1, opd2, t) match=CODE.S> @"new list<"t">("opd1","opd2")"@ </code>
+<code Bop pars=(op, opd1, opd2) match=CODE.S> @opd1 op opd2@ </code>
+<code Rop pars=(op, opd) match=CODE.S> @opd@ </code>
+<code Pop pars=(opd) match=CODE.S> @"("opd")"@ </code>
+<code Uop pars=(op, opd) match=CODE.S> @op opd@ </code>
+
+<code Type parse=( ("int" eval(return IntType))
+        |("float" eval(return FloatType))
+        |("[" (t=Type) "]" eval(return(PtrType#(t)))))/>
+
+<code Goal pars=(program:LIST(CODE.ExpStmt, "\n")) parse=program>
+@program@
+</code>
+
+<code ExpStmt pars=(exp : CODE.S, type)
+        parse=(exp ";" eval(return(ExpStmt#(exp[ATTR.exp],exp[ATTR.type]))))>
+@exp@;
+</code>
+
+
+<code S parse=(CODE.UP CODE.I (exp=CODE.DP) eval(return (exp))) />
+
+<code DP parse=(
+         ("+" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { print("mismatching type: " INHERIT "vs." factor); t = CODE.TypeError; }
+                ATTR#(Bop#("+",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                        (e=CODE.DP) eval(return e) )
+        | ("-" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { print("mismatching type: " INHERIT "vs." factor); t = CODE.TypeError; }
+                ATTR#(Bop#("-",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                        (e=CODE.DP) eval(return e) )
+		| ("::" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { print("mismatching type: " INHERIT "vs." factor); t = CODE.TypeError; }
+
+
+
+                if (factor == "[]") {ATTR#(Lop#("::", INHERIT[ATTR.exp], 0, t), t); }
+                else if (LEN(factor) == 1) {ATTR#(L2op#("::", INHERIT[ATTR.exp], factor[ATTR.exp], t), t); }
+
+
+                else if (LEN(factor) == 4)
+                {for (i = factor; i != NULL; i = TAIL(i))
+                 {
+                   if(LEN(i) == 4){x1 = HEAD(i);}
+                   if(LEN(i) == 3){x2 = HEAD(i);}
+                   if(LEN(i) == 2){x3 = HEAD(i);}
+                   if(LEN(i) == 1){x4 = HEAD(i);}
+                 }
+                 ATTR#(L4op#("::", INHERIT[ATTR.exp], x1[ATTR.exp], x2[ATTR.exp], x3[ATTR.exp], x4[ATTR.exp], t), t);
+                }
+                 )
+                        (e=CODE.DP) eval(return e) )
+
+        | (">" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else {  t = CODE.TypeError; }
+                ATTR#(Bop#(">",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+		
+		| ("<" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { t = CODE.TypeError; }
+                ATTR#(Bop#("<",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+
+
+        | ("or" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { t = CODE.TypeError; }
+                ATTR#(Bop#("||",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+
+        | ("and" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else {t = CODE.TypeError; }
+                ATTR#(Bop#("&&",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+		| ("*" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { print("mismatching type: " INHERIT "vs." factor); t = CODE.TypeError; }
+                ATTR#(Bop#("*",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+
+        | ("/" (factor=CODE.I)
+                eval(
+                if (INHERIT[ATTR.type]==IntType && factor[ATTR.type]==IntType)
+                        {t=CODE.IntType;}
+                else if (INHERIT[ATTR.type]==FloatType && factor[ATTR.type]==FloatType)
+                        { t = CODE.FloatType; }
+                else { print("mismatching type: " INHERIT "vs." factor); t = CODE.TypeError; }
+                ATTR#(Bop#("/",INHERIT[ATTR.exp],factor[ATTR.exp]),t))
+                (e=CODE.DP) eval(return e) )
+
+        | (","(e2=( (e3=CODE.I) "," (e4=CODE.I) "," (e5=CODE.I))) eval(e2=REPLACE(",", "", e2); e2=INHERIT::e2; if(INHERIT[ATTR.exp]==1){return ATTR#(L4Nop#("::",INHERIT[ATTR.exp],e3[ATTR.exp],e4[ATTR.exp],e5[ATTR.exp],IntType),IntType);} else{return e2;}) )
+
+        | ("" eval (return INHERIT) )) />
+
+<code UP parse=(
+          ("!")
+        | ("") )/>
+
+<code I parse=(
+                  ((v=INT) eval(return (CODE.ATTR#(v,IntType))))
+                | ID
+                | ( "(" (e=CODE.S) ")" eval(return CODE.ATTR#(Pop#(e[ATTR.exp]), FloatType)  ) )
+                | ( "ref" (e=CODE.S) eval(return CODE.ATTR#(Rop#("ref", e[ATTR.exp]), IntType) ) )
+                | ( "not" (e=CODE.S) eval(return CODE.ATTR#(Uop#("!", e[ATTR.exp]), e[ATTR.type]) ) )
+                | ( "tl" (e=CODE.S) eval(return CODE.ATTR#(Uop#("tl", e[ATTR.exp]), e[ATTR.type]) ) )
+                | "[]"
+                | ("[" e=CODE.S "]" eval(return e))
+                | ((v=FLOAT) eval(return (CODE.ATTR#(v,FloatType)))) ) />

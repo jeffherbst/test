@@ -1,0 +1,8 @@
+<parameter infile message="test.inp"/>
+<define symTable ""/>
+<input from=(infile) syntax="proj3-1.code" to=ast />
+<eval( print("#include <ml-c.h>") )/>
+<eval( print("int main() \n{") )/>
+<output from=(ast) syntax="proj3-1.code" />
+<eval( print (" \n}") )/>
+
